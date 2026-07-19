@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
+import { PENDING_KEY } from "../lib/pendingIdea";
 
 type AuthContextValue = {
   session: Session | null;
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    sessionStorage.removeItem(PENDING_KEY);
     await supabase.auth.signOut();
   }
 

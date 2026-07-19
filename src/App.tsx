@@ -1,11 +1,15 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { AppLayout } from "./components/AppLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
-import { DashboardPage } from "./pages/DashboardPage";
+import { HomePage } from "./pages/HomePage";
+import { HistoryPage } from "./pages/HistoryPage";
+import { TrackingPage } from "./pages/TrackingPage";
 import { ResultPage } from "./pages/ResultPage";
 import { TrackNichePage } from "./pages/TrackNichePage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 
 export default function App() {
   return (
@@ -13,12 +17,40 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/privacy"
+            element={
+              <AppLayout>
+                <PrivacyPage />
+              </AppLayout>
+            }
+          />
           <Route path="/signup" element={<SignupPage />} />
           <Route
             path="/"
             element={
+              <AppLayout>
+                <HomePage />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/history"
+            element={
               <ProtectedRoute>
-                <DashboardPage />
+                <AppLayout>
+                  <HistoryPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tracking"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <TrackingPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -26,7 +58,9 @@ export default function App() {
             path="/results/:id"
             element={
               <ProtectedRoute>
-                <ResultPage />
+                <AppLayout>
+                  <ResultPage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />
@@ -34,7 +68,9 @@ export default function App() {
             path="/track/:id"
             element={
               <ProtectedRoute>
-                <TrackNichePage />
+                <AppLayout>
+                  <TrackNichePage />
+                </AppLayout>
               </ProtectedRoute>
             }
           />

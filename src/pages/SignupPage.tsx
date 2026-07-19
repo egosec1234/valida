@@ -26,45 +26,56 @@ export function SignupPage() {
 
   if (done) {
     return (
-      <div className="auth-page">
-        <h1>Check your email</h1>
-        <p>We sent a confirmation link to {email}. Confirm, then log in.</p>
-        <Link to="/login">Go to login</Link>
+      <div className="page page-narrow">
+        <div className="panel">
+          <h1 className="panel-title">Check your email</h1>
+          <p className="panel-subhead">
+            We sent a confirmation link to {email}. Confirm, then log in.
+          </p>
+          <Link to="/login" className="link-button">
+            Go to login
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="auth-page">
+    <div className="page page-narrow">
       <Hero />
-      <h2>Create your Valida account</h2>
-      <form onSubmit={handleSubmit} className="auth-form">
-        <label>
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        {error && <p className="form-error">{error}</p>}
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Signing up..." : "Sign up"}
-        </button>
-      </form>
-      <p>
+      <div className="panel">
+        <h1 className="panel-title">Create an account</h1>
+        <form onSubmit={handleSubmit} className="field-group">
+          <label>
+            Email
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <button type="submit" disabled={submitting}>
+            {submitting ? "Signing up..." : "Sign up"}
+          </button>
+        </form>
+      </div>
+      <p className="auth-switch">
         Already have an account? <Link to="/login">Log in</Link>
+      </p>
+      <p className="auth-switch">
+        By signing up, you agree to our <Link to="/privacy">Privacy Policy</Link>.
       </p>
     </div>
   );

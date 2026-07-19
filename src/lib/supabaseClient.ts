@@ -19,11 +19,27 @@ export type Submission = {
   created_at: string;
 };
 
+export type Risk = {
+  risk: string;
+  explanation?: string;
+};
+
+export type Competitor = {
+  name: string;
+  description: string;
+  pricing?: string;
+  threat?: string;
+  differentiation?: string;
+  url?: string;
+};
+
 export type Report = {
   score: number;
   summary: string;
-  risks: string[];
-  competitors: { name: string; description: string; url?: string }[];
+  // Older submissions stored risks as plain strings; new ones carry an
+  // explanation too. Support both so old reports still render.
+  risks: (string | Risk)[];
+  competitors: Competitor[];
   recommendation: string;
 };
 

@@ -20,6 +20,7 @@ export function TrackNichePage() {
 
   async function load() {
     setLoading(true);
+    setError(null);
     const [{ data: sub, error: subError }, { data: tracked }] = await Promise.all([
       supabase.from("submissions").select("*").eq("id", submissionId).single(),
       supabase
@@ -74,46 +75,57 @@ export function TrackNichePage() {
   if (loading) return <p className="page-loading">Loading...</p>;
   if (error && !submission) {
     return (
-      <div className="track-page">
+      <div className="page">
         <p className="form-error">{error}</p>
-        <Link to="/">Back to dashboard</Link>
+        <Link to="/history" className="back-link">
+          &larr; Back to history
+        </Link>
       </div>
     );
   }
   if (!submission) return null;
 
   return (
-    <div className="track-page">
+    <div className="page">
       <Link to={`/results/${submission.id}`} className="back-link">
         &larr; Back to results
       </Link>
 
-      <span className="pill pill-highlight">Weekly Niche Monitoring</span>
-      <h1>Don't get blindsided after you've already started building.</h1>
-      <p className="track-subhead">
-        Your free score is a snapshot from today. Markets move — a new competitor,
-        a funding round, or a shift in demand can change everything a few weeks in.
-        Weekly monitoring keeps watch on{" "}
-        <strong>{submission.niche || "this niche"}</strong> for you, automatically.
+      <span className="eyebrow">Continuous watch</span>
+      <h1 style={{ margin: "0.75rem 0 1rem", fontSize: "1.6rem", lineHeight: 1.25 }}>
+        Don't get blindsided after you've already started building.
+      </h1>
+      <p className="idea-text" style={{ fontSize: "0.98rem", color: "var(--ink-muted)" }}>
+        Your free score is a snapshot from today. A new competitor can show up,
+        or the ones you already found can raise money and pull ahead, weeks
+        after you stopped looking. Weekly monitoring keeps watching{" "}
+        <strong style={{ color: "var(--ink)" }}>
+          {submission.niche || "this niche"}
+        </strong>{" "}
+        for you.
       </p>
 
-      <ul className="track-benefits">
-        <li>Weekly re-scan of your niche for new competitors and market signals</li>
-        <li>An email alert the moment something material changes</li>
-        <li>A running history of how your market is evolving, not just one snapshot</li>
+      <div className="section-label" style={{ marginTop: "2rem" }}>
+        What continuous watch includes
+      </div>
+      <ul className="spec-list">
+        <li>Weekly re-scan of your niche for new competitors</li>
+        <li>An email the moment something changes that actually matters</li>
+        <li>A running history of your market over time, instead of a single snapshot</li>
       </ul>
 
       {existing ? (
-        <div className="track-confirmed">
-          <p>
-            <strong>You're on the list.</strong> We'll email you as soon as weekly
-            monitoring is live for this niche.
+        <div className="panel upsell-panel">
+          <span className="status-pill status-pending_upgrade">On the list</span>
+          <p style={{ marginTop: "0.85rem", marginBottom: 0 }}>
+            We'll email you as soon as weekly monitoring is live for this niche.
           </p>
         </div>
       ) : (
-        <div className="track-cta-box">
-          <p className="track-price-note">
-            Pricing isn't final yet — join the waitlist and we'll notify you at launch.
+        <div className="panel">
+          <p className="panel-subhead" style={{ marginBottom: "1.1rem" }}>
+            Pricing isn't final yet. Join the waitlist and we'll notify you at
+            launch.
           </p>
           {error && <p className="form-error">{error}</p>}
           <button onClick={handleJoinWaitlist} disabled={joining}>

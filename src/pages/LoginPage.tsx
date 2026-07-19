@@ -25,34 +25,36 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth-page">
+    <div className="page page-narrow">
       <Hero />
-      <h2>Log in to Valida</h2>
-      <form onSubmit={handleSubmit} className="auth-form">
-        <label>
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        {error && <p className="form-error">{error}</p>}
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Logging in..." : "Log in"}
-        </button>
-      </form>
-      <p>
+      <div className="panel">
+        <h1 className="panel-title">Log in</h1>
+        <form onSubmit={handleSubmit} className="field-group">
+          <label>
+            Email
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <button type="submit" disabled={submitting}>
+            {submitting ? "Logging in..." : "Log in"}
+          </button>
+        </form>
+      </div>
+      <p className="auth-switch">
         No account? <Link to="/signup">Sign up</Link>
       </p>
     </div>
