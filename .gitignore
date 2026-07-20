@@ -17,3 +17,6 @@ supabase/.temp/
 .agents/
 skills-lock.json
 *.patch
+
+.vercel
+.env*

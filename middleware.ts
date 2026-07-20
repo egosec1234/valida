@@ -239,8 +239,12 @@ export default async function middleware(request: Request) {
   }
 
   // The privacy policy stays reachable without the pre-launch password -
-  // it needs to be publicly viewable, not gated behind an invite.
-  if (url.pathname === "/privacy") {
+  // it needs to be publicly viewable, not gated behind an invite. Its own
+  // JS/CSS bundle (Vite's build output, all under /assets/) has to bypass
+  // the gate too, or the page loads as blank HTML with no script to render
+  // it: those files aren't gated content, just the app's compiled code,
+  // and the /privacy page can't render without them.
+  if (url.pathname === "/privacy" || url.pathname.startsWith("/assets/")) {
     return next();
   }
 
