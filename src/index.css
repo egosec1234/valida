@@ -259,6 +259,36 @@ button:disabled {
   margin: 0;
 }
 
+.form-success {
+  font-family: var(--font-mono);
+  color: var(--signal);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.danger-zone {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.danger-zone-title {
+  color: var(--danger);
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.danger-button {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #8f2718;
+  border-color: #8f2718;
+}
+
 /* --------------------------------------------------------------------------
    Panels
    -------------------------------------------------------------------------- */

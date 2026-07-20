@@ -10,6 +10,7 @@ import { TrackingPage } from "./pages/TrackingPage";
 import { ResultPage } from "./pages/ResultPage";
 import { TrackNichePage } from "./pages/TrackNichePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { AccountPage } from "./pages/AccountPage";
 
 export default function App() {
   return (
@@ -70,6 +71,16 @@ export default function App() {
               <ProtectedRoute>
                 <AppLayout>
                   <TrackNichePage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <AccountPage />
                 </AppLayout>
               </ProtectedRoute>
             }

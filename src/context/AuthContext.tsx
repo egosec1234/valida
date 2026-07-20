@@ -16,6 +16,9 @@ type AuthContextValue = {
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  updateEmail: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
+  deleteAccount: () => Promise<{ error: string | null }>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -52,9 +55,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }
 
+  async function updateEmail(email: string) {
+    const { error } = await supabase.auth.updateUser({ email });
+    return { error: error?.message ?? null };
+  }
+
+  async function updatePassword(password: string) {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error?.message ?? null };
+  }
+
+  async function deleteAccount() {
+    const { data, error } = await supabase.functions.invoke("delete-account");
+    if (error) {
+      let message = error.message;
+      if ("context" in error && error.context instanceof Response) {
+        try {
+          const body = await error.context.clone().json();
+          if (body?.error) message = body.error;
+        } catch {
+          // response body wasn't JSON - fall back to the generic message
+        }
+      }
+      return { error: message };
+    }
+    if (data?.error) {
+      return { error: data.error };
+    }
+    sessionStorage.removeItem(PENDING_KEY);
+    await supabase.auth.signOut();
+    return { error: null };
+  }
+
   return (
     <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, loading, signUp, signIn, signOut }}
+      value={{
+        session,
+        user: session?.user ?? null,
+        loading,
+        signUp,
+        signIn,
+        signOut,
+        updateEmail,
+        updatePassword,
+        deleteAccount,
+      }}
     >
       {children}
     </AuthContext.Provider>

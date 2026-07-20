@@ -5,6 +5,7 @@ const LINKS = [
   { to: "/", label: "New idea" },
   { to: "/history", label: "Score history", alsoActiveOn: ["/results"] },
   { to: "/tracking", label: "Tracking", alsoActiveOn: ["/track"] },
+  { to: "/account", label: "Account" },
 ];
 
 function isLinkActive(pathname: string, link: (typeof LINKS)[number]) {
