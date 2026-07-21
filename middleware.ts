@@ -78,18 +78,8 @@ function gatePage(showError: boolean): Response {
   a { color: var(--accent); }
   main { max-width: 780px; margin: 0 auto; padding: 4.5rem 1.5rem 5rem; }
 
-  .eyebrow {
-    font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--accent); display: inline-flex;
-    align-items: center; gap: 0.5rem;
-  }
-  .eyebrow::before {
-    content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
-    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
-  }
-
   .hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 2.5rem; align-items: center; }
-  .hero h1 { font-size: 2.5rem; line-height: 1.15; margin: 0.85rem 0 1.1rem; }
+  .hero h1 { font-size: 2.5rem; line-height: 1.15; margin: 0 0 1.1rem; }
   .hero p { color: var(--text-muted); font-size: 1.05rem; line-height: 1.6; margin: 0; max-width: 46ch; }
 
   .radar {
@@ -167,7 +157,6 @@ function gatePage(showError: boolean): Response {
   <main>
     <div class="hero">
       <div>
-        <span class="eyebrow">Private access &middot; pre-launch</span>
         <h1>Don't get blindsided by a new competitor after you've already started building.</h1>
         <p>Get a free idea score in minutes. Then Valida keeps watching your niche every week, so you hear about threats while there's still time to react, instead of after the fact.</p>
       </div>

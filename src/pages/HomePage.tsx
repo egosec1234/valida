@@ -82,14 +82,14 @@ export function HomePage() {
   return (
     <div className="landing">
       <div className="landing-hero">
-        <span className="eyebrow">Free idea score</span>
         <h1>
           Don't get blindsided by a new competitor after you've already started
           building.
         </h1>
         <p>
-          Tell us your idea. We'll score it honestly, then watch your niche every
-          week so you're never the last to know when something changes.
+          Tell us your idea. We'll give you a free, honest score, then watch
+          your niche every week so you're never the last to know when
+          something changes.
         </p>
       </div>
 

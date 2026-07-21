@@ -1,8 +1,7 @@
 export function PrivacyPage() {
   return (
     <div className="page" style={{ maxWidth: "760px" }}>
-      <span className="eyebrow">Privacy</span>
-      <h1 style={{ margin: "0.75rem 0 0.5rem", fontSize: "1.6rem" }}>Privacy policy</h1>
+      <h1 style={{ margin: "0 0 0.5rem", fontSize: "1.6rem" }}>Privacy policy</h1>
       <p className="panel-subhead" style={{ marginBottom: "2rem" }}>
         Last updated July 19, 2026.
       </p>

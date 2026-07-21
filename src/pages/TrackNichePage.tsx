@@ -91,8 +91,7 @@ export function TrackNichePage() {
         &larr; Back to results
       </Link>
 
-      <span className="eyebrow">Continuous watch</span>
-      <h1 style={{ margin: "0.75rem 0 1rem", fontSize: "1.6rem", lineHeight: 1.25 }}>
+      <h1 style={{ margin: "0 0 1rem", fontSize: "1.6rem", lineHeight: 1.25 }}>
         Don't get blindsided after you've already started building.
       </h1>
       <p className="idea-text" style={{ fontSize: "0.98rem", color: "var(--ink-muted)" }}>

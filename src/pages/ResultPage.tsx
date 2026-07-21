@@ -98,7 +98,6 @@ export function ResultPage() {
           />
         </div>
         <div className="scan-status">
-          <span className="eyebrow">Scanning</span>
           <h1>Researching your idea</h1>
         </div>
         <p className="idea-text">{submission.idea_text}</p>
@@ -123,10 +122,7 @@ export function ResultPage() {
         <Link to="/history" className="back-link">
           &larr; Back to history
         </Link>
-        <span className="eyebrow" style={{ color: "var(--danger)" }}>
-          Scan failed
-        </span>
-        <h1 style={{ margin: "0.6rem 0 1.5rem" }}>Something went wrong</h1>
+        <h1 style={{ margin: "0 0 1.5rem" }}>Something went wrong</h1>
         <p className="idea-text">{submission.idea_text}</p>
         <p className="form-error" style={{ marginTop: "1rem" }}>
           {submission.error_message ?? "The research task failed unexpectedly."}
@@ -142,8 +138,7 @@ export function ResultPage() {
       <Link to="/history" className="back-link">
         &larr; Back to history
       </Link>
-      <span className="eyebrow">Scan complete</span>
-      <h1 style={{ margin: "0.6rem 0 0.75rem" }}>Your free score</h1>
+      <h1 style={{ margin: "0 0 0.75rem" }}>Your free score</h1>
       <p className="idea-text">{submission.idea_text}</p>
       {submission.niche && <p className="niche-tag">{submission.niche}</p>}
 

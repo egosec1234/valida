@@ -122,10 +122,10 @@ export function SubmissionForm() {
   if (awaitingAuth) {
     return (
       <div className="auth-prompt">
-        <span className="eyebrow">One step left</span>
         <p>
-          Create a free account (or log in if you already have one) and we'll
-          score this idea right away, using what you already typed.
+          One more step: create a free account (or log in if you already have
+          one) and we'll score this idea right away, using what you already
+          typed.
         </p>
         <div className="auth-prompt-actions">
           <Link to="/signup" className="button-link">
