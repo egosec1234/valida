@@ -243,6 +243,55 @@ Deno.serve(async (req: Request) => {
   }
 });
 
+const MAX_ATTEMPTS = 2;
+
+// Rarely, the model returns a bare-minimum schema-valid stub instead of a
+// real report (e.g. summary "placeholder", score 0, empty risks/competitors)
+// - a degenerate response, not a thrown error, so it would otherwise get
+// saved as a successful "complete" result. Treat it as a failed attempt.
+function isDegenerateReport(report: {
+  summary?: string;
+  risks?: unknown[];
+  competitors?: unknown[];
+}): boolean {
+  if (!report.summary || report.summary.trim().toLowerCase() === "placeholder") {
+    return true;
+  }
+  return (report.risks?.length ?? 0) === 0 && (report.competitors?.length ?? 0) === 0;
+}
+
+async function requestReport(anthropic: Anthropic, ideaText: string, niche: string | undefined) {
+  const userPrompt = `Business idea: ${ideaText}\nNiche/category: ${
+    niche || "(not specified)"
+  }\n\nResearch this idea's market and competitors, then score it.`;
+
+  const message = await anthropic.messages.create({
+    model: MODEL_ID,
+    max_tokens: 10000,
+    thinking: { type: "disabled" },
+    output_config: {
+      effort: "medium",
+      format: { type: "json_schema", schema: REPORT_SCHEMA },
+    },
+    system: SYSTEM_PROMPT,
+    tools: [
+      { type: "web_search_20260209", name: "web_search", max_uses: 2 },
+    ],
+    messages: [{ role: "user", content: userPrompt }],
+  });
+
+  if (message.stop_reason === "refusal") {
+    throw new Error("The model declined to process this request.");
+  }
+
+  const textBlock = message.content.find((b) => b.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("No structured report returned by the model");
+  }
+
+  return JSON.parse(textBlock.text);
+}
+
 async function runAnalysis(
   supabase: SupabaseClient,
   anthropicApiKey: string,
@@ -253,37 +302,32 @@ async function runAnalysis(
   try {
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
-    const userPrompt = `Business idea: ${ideaText}\nNiche/category: ${
-      niche || "(not specified)"
-    }\n\nResearch this idea's market and competitors, then score it.`;
+    let report: Awaited<ReturnType<typeof requestReport>> | undefined;
+    let lastError: unknown;
 
-    const message = await anthropic.messages.create({
-      model: MODEL_ID,
-      max_tokens: 10000,
-      thinking: { type: "disabled" },
-      output_config: {
-        effort: "medium",
-        format: { type: "json_schema", schema: REPORT_SCHEMA },
-      },
-      system: SYSTEM_PROMPT,
-      tools: [
-        { type: "web_search_20260209", name: "web_search", max_uses: 2 },
-      ],
-      messages: [{ role: "user", content: userPrompt }],
-    });
-
-    if (message.stop_reason === "refusal") {
-      await markFailed(supabase, submissionId, "The model declined to process this request.");
-      return;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const candidate = await requestReport(anthropic, ideaText, niche);
+        if (!isDegenerateReport(candidate)) {
+          report = candidate;
+          break;
+        }
+        lastError = new Error("Model returned an empty/placeholder report");
+        console.error(`Attempt ${attempt}: degenerate report, retrying`);
+      } catch (err) {
+        lastError = err;
+        console.error(`Attempt ${attempt} failed:`, err);
+      }
     }
 
-    const textBlock = message.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      await markFailed(supabase, submissionId, "No structured report returned by the model");
+    if (!report) {
+      await markFailed(
+        supabase,
+        submissionId,
+        lastError instanceof Error ? lastError.message : "Failed to generate a report",
+      );
       return;
     }
-
-    const report = JSON.parse(textBlock.text);
 
     const { error: updateError } = await supabase
       .from("submissions")
