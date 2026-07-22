@@ -556,6 +556,17 @@ button:disabled {
 }
 
 /* --------------------------------------------------------------------------
+   Blur gate - real report content, rendered but unreadable, so a free
+   viewer can see there's substance behind the paywall without reading it.
+   -------------------------------------------------------------------------- */
+
+.blur-gate {
+  filter: blur(5px);
+  user-select: none;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
    Section headings
    -------------------------------------------------------------------------- */
 

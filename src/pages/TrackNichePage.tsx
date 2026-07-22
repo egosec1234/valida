@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { supabase, type Submission, type TrackedNiche } from "../lib/supabaseClient";
+import {
+  supabase,
+  type NicheUpdate,
+  type Submission,
+  type TrackedNiche,
+} from "../lib/supabaseClient";
 import { useAuth } from "../context/AuthContext";
 
 export function TrackNichePage() {
@@ -9,16 +14,24 @@ export function TrackNichePage() {
 
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [existing, setExisting] = useState<TrackedNiche | null>(null);
+  const [updates, setUpdates] = useState<NicheUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!submissionId) return;
-    load();
+    let cancelled = false;
+    load(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
   }, [submissionId]);
 
-  async function load() {
+  // isCancelled lets a quick navigation to a different tracked niche (before
+  // this load finishes) skip its own stale setState calls, instead of
+  // overwriting the newer page with this one's slower response.
+  async function load(isCancelled: () => boolean) {
     setLoading(true);
     setError(null);
     const [{ data: sub, error: subError }, { data: tracked }] = await Promise.all([
@@ -29,9 +42,24 @@ export function TrackNichePage() {
         .eq("submission_id", submissionId)
         .maybeSingle(),
     ]);
+    if (isCancelled()) return;
+
     if (subError) setError(subError.message);
     else setSubmission(sub as Submission);
-    setExisting((tracked as TrackedNiche) ?? null);
+
+    const trackedNiche = (tracked as TrackedNiche) ?? null;
+    setExisting(trackedNiche);
+
+    if (trackedNiche?.status === "active") {
+      const { data: updateRows } = await supabase
+        .from("niche_updates")
+        .select("*")
+        .eq("tracked_niche_id", trackedNiche.id)
+        .order("created_at", { ascending: false });
+      if (isCancelled()) return;
+      setUpdates((updateRows as NicheUpdate[]) ?? []);
+    }
+
     setLoading(false);
   }
 
@@ -113,7 +141,59 @@ export function TrackNichePage() {
         <li>A running history of your market over time, instead of a single snapshot</li>
       </ul>
 
-      {existing ? (
+      {existing?.status === "active" ? (
+        <>
+          <div className="panel upsell-panel">
+            <span className="status-pill status-active">Monitoring active</span>
+            <p style={{ marginTop: "0.85rem", marginBottom: 0 }}>
+              We check this niche weekly and email you when something worth
+              knowing changes.
+            </p>
+          </div>
+
+          <div className="section-label" style={{ marginTop: "2rem" }}>
+            Update history
+          </div>
+          {updates.length === 0 ? (
+            <p className="empty-note">
+              No checks yet. The first one runs on the next weekly cycle.
+            </p>
+          ) : (
+            <ul className="data-list">
+              {updates.map((update) => (
+                <li key={update.id} className="data-row">
+                  <span className="data-row-index">
+                    {new Date(update.created_at).toLocaleDateString()}
+                  </span>
+                  <span>
+                    <span className={`status-pill status-${update.status}`}>
+                      {update.status === "processing" && "Checking for changes"}
+                      {update.status === "failed" && "Didn't complete"}
+                      {update.status === "complete" &&
+                        (update.has_meaningful_changes ? "Something changed" : "No major changes")}
+                    </span>
+                    {update.status === "complete" && (
+                      <>
+                        {update.summary && (
+                          <div className="data-row-detail">{update.summary}</div>
+                        )}
+                        {update.notable_changes.map((change, i) => (
+                          <div className="data-row-detail" key={i}>
+                            <strong style={{ color: "var(--ink)" }}>
+                              {change.change}:
+                            </strong>{" "}
+                            {change.detail}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      ) : existing ? (
         <div className="panel upsell-panel">
           <span className="status-pill status-pending_upgrade">On the list</span>
           <p style={{ marginTop: "0.85rem", marginBottom: 0 }}>

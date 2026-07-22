@@ -10,13 +10,16 @@
 
 import Anthropic from "npm:@anthropic-ai/sdk@0.32.1";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { describeError, markFailed, requestStructuredReport, requestWithRetry } from "../_shared/claudeReport.ts";
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
-const MODEL_ID = Deno.env.get("ANTHROPIC_MODEL_ID") ?? "claude-sonnet-5";
-
 const IDEA_TEXT_MAX_LENGTH = 500;
 const NICHE_MAX_LENGTH = 100;
+// Matches STALE_AFTER_MS in src/pages/ResultPage.tsx - a "processing" row
+// older than this almost certainly died mid-run rather than being genuinely
+// in progress.
+const STALE_PROCESSING_MS = 3 * 60 * 1000;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,7 +42,8 @@ const REPORT_SCHEMA = {
     },
     risks: {
       type: "array",
-      description: "Key risks or red flags for this idea, each with a concrete explanation. At most 4 items.",
+      description:
+        "Key risks or red flags for this idea, each with a concrete explanation. At most 4 items, ordered from most to least critical - the free preview shows only the first one.",
       items: {
         type: "object",
         properties: {
@@ -59,7 +63,8 @@ const REPORT_SCHEMA = {
     },
     competitors: {
       type: "array",
-      description: "Real competitors or close substitutes found via research. At most 4 items.",
+      description:
+        "Real competitors or close substitutes found via research. At most 4 items, ordered from the biggest threat to the smallest - the free preview shows only the first one in full.",
       items: {
         type: "object",
         properties: {
@@ -80,19 +85,77 @@ const REPORT_SCHEMA = {
             description:
               "One sentence on how this competitor differs from the other competitors listed in this same report.",
           },
+          howToCompete: {
+            type: "string",
+            description:
+              "One to two sentences on a specific, concrete angle this founder could use to win against this exact competitor: a gap in what they offer, a segment they ignore, a pricing angle, or something else grounded in what you found. Never generic advice like 'focus on better UX'.",
+          },
           url: { type: "string" },
         },
-        required: ["name", "description", "threat", "differentiation"],
+        required: ["name", "description", "threat", "differentiation", "howToCompete"],
         additionalProperties: false,
       },
+    },
+    basicRecommendation: {
+      type: "string",
+      description:
+        "One sentence: proceed, don't, or proceed only if a specific condition changes. This is shown on its own in the free preview, before the full reasoning, so it must stand alone without the rest of the report.",
     },
     recommendation: {
       type: "string",
       description:
         "2-3 full sentences giving a direct recommendation on whether/how to proceed, naming the specific condition or change that would make this idea worth pursuing (or why it isn't worth pursuing at all). Never a single word or sentence fragment.",
     },
+    pivots: {
+      type: "array",
+      description:
+        "Real alternate directions for this idea, if your research turned up one genuinely worth considering. At most 3 items. Leave this an empty array if the idea is fine as-is or no real pivot stands out - never invent one just to fill the field.",
+      items: {
+        type: "object",
+        properties: {
+          pivot: {
+            type: "string",
+            description: "The alternate direction itself, stated plainly in one short phrase.",
+          },
+          reason: {
+            type: "string",
+            description:
+              "One to two sentences on why this pivot is worth considering, grounded in what you found.",
+          },
+        },
+        required: ["pivot", "reason"],
+        additionalProperties: false,
+      },
+    },
+    sources: {
+      type: "array",
+      description:
+        "The specific sources you actually used - articles, official pricing pages, funding announcements, industry reports. At most 5 items, real URLs only. Leave this an empty array rather than inventing one if nothing is worth citing directly.",
+      items: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description:
+              "A specific, identifying label for this source (e.g. 'TechCrunch: Acme raises $10M Series A'), not just the publication name.",
+          },
+          url: { type: "string" },
+        },
+        required: ["title", "url"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ["score", "summary", "risks", "competitors", "recommendation"],
+  required: [
+    "score",
+    "summary",
+    "risks",
+    "competitors",
+    "basicRecommendation",
+    "recommendation",
+    "pivots",
+    "sources",
+  ],
   additionalProperties: false,
 };
 
@@ -107,17 +170,35 @@ For each competitor, go beyond a one-line description: give rough pricing if you
 actually found it (never guess or invent a number; leave it out if you didn't find \
 it), explain specifically what makes them a threat to this idea (their scale, \
 funding, distribution, or existing customer base, not just "they also do this"), \
-and say how they differ from the other competitors in your list. For each risk, add \
-a sentence of concrete explanation grounded in your research rather than restating \
-the risk.
+say how they differ from the other competitors in your list, and give one concrete \
+way this founder could actually win against that specific competitor - a gap in \
+what they offer, a segment they ignore, a pricing angle, or something else grounded \
+in what you found, never generic advice. For each risk, add a sentence of concrete \
+explanation grounded in your research rather than restating the risk.
+
+Give a one-sentence basic recommendation that stands on its own: proceed, don't, \
+or proceed only if a specific condition changes. Then give the fuller \
+recommendation with your full reasoning. If your research points to a genuinely \
+different direction this idea should consider instead, list it as a pivot with a \
+short reason; if the idea is sound as-is or no real pivot stands out, leave the \
+pivot list empty rather than inventing one.
+
+When a claim in your summary or recommendation comes from something specific you \
+found (a competitor's funding round, a pricing change, a market size figure, a \
+notable news item), name where it came from so a founder can verify it instead of \
+taking your word for it. List the specific sources you actually used, with their \
+real URLs, in the sources field - never fabricate one, and leave it empty rather \
+than citing something you didn't actually check.
 
 Write in plain, direct sentences, the way you'd actually talk to a founder. Skip \
 hedge words, filler transitions, and stock phrases. Don't force findings into three \
 matching bullet points if the real number is two or four. Name real companies, \
 numbers, and mechanisms instead of vague description. Return at most 4 risks and \
 at most 4 competitors - pick the ones that matter most rather than listing every \
-one you find, and never cut a sentence short to fit more in. Return your findings \
-in the required structured format only.`;
+one you find, and never cut a sentence short to fit more in. List risks in order \
+from most to least critical and competitors in order from biggest threat to \
+smallest - the first one of each is the one that matters most. Return your \
+findings in the required structured format only.`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -150,8 +231,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Client scoped to the requesting user's JWT so inserts/updates respect
-    // RLS (auth.uid() = user_id) without needing the service-role key.
+    // Client scoped to the requesting user's JWT so the initial insert
+    // respects RLS (auth.uid() = user_id) without needing the service-role
+    // key. Submissions RLS only grants select/insert to authenticated users
+    // (see 20260722143144_restrict_submissions_update.sql) - the background
+    // write-back below uses a separate service-role client instead.
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -171,6 +255,17 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Server misconfigured: missing ANTHROPIC_API_KEY" }, 500);
     }
 
+    // Service-role client: used both to self-heal a stuck submission below
+    // and for the background write-back after this function returns. The
+    // row's owner only has select/insert access on submissions (see
+    // 20260722143144_restrict_submissions_update.sql), so neither a stuck
+    // row's recovery nor score/report/status can be set from a user-scoped
+    // client.
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
     // Free tier: one active (non-failed) submission per account, ever.
     // Admin accounts (app_metadata.is_admin, only settable via the
     // service-role Admin API) are exempt. This check is a fast path for a
@@ -180,19 +275,38 @@ Deno.serve(async (req: Request) => {
     if (!isAdmin) {
       const { data: existing } = await supabase
         .from("submissions")
-        .select("id, status")
+        .select("id, status, created_at")
         .neq("status", "failed")
         .limit(1)
         .maybeSingle();
 
       if (existing) {
-        return json(
-          {
-            error: "You've already used your free score.",
-            existingSubmissionId: existing.id,
-          },
-          403,
-        );
+        // A "processing" row this old almost certainly means the background
+        // worker died mid-run without ever reaching its own catch block.
+        // Without this, an account with a genuinely stuck submission could
+        // never submit again - ResultPage.tsx's "Try again" link routes
+        // here, but this same check would otherwise still see the stuck row
+        // and block a fresh one with no way out.
+        const isStaleProcessing =
+          existing.status === "processing" &&
+          Date.now() - new Date(existing.created_at).getTime() > STALE_PROCESSING_MS;
+
+        if (isStaleProcessing) {
+          await markFailed(
+            supabaseAdmin,
+            "submissions",
+            existing.id,
+            "This took too long and was stopped automatically. Please try again.",
+          );
+        } else {
+          return json(
+            {
+              error: "You've already used your free score.",
+              existingSubmissionId: existing.id,
+            },
+            403,
+          );
+        }
       }
     }
 
@@ -233,7 +347,7 @@ Deno.serve(async (req: Request) => {
     }
 
     EdgeRuntime.waitUntil(
-      runAnalysis(supabase, anthropicApiKey, inserted.id, idea_text, niche),
+      runAnalysis(supabaseAdmin, anthropicApiKey, inserted.id, idea_text, niche),
     );
 
     return json({ submission: inserted });
@@ -243,53 +357,28 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-const MAX_ATTEMPTS = 2;
+type Report = {
+  score: number;
+  summary: string;
+  risks: unknown[];
+  competitors: unknown[];
+  basicRecommendation: string;
+  recommendation: string;
+  pivots: unknown[];
+};
 
 // Rarely, the model returns a bare-minimum schema-valid stub instead of a
 // real report (e.g. summary "placeholder", score 0, empty risks/competitors)
 // - a degenerate response, not a thrown error, so it would otherwise get
 // saved as a successful "complete" result. Treat it as a failed attempt.
-function isDegenerateReport(report: {
-  summary?: string;
-  risks?: unknown[];
-  competitors?: unknown[];
-}): boolean {
+function isDegenerateReport(report: Report): boolean {
   if (!report.summary || report.summary.trim().toLowerCase() === "placeholder") {
     return true;
   }
+  if (!report.basicRecommendation) {
+    return true;
+  }
   return (report.risks?.length ?? 0) === 0 && (report.competitors?.length ?? 0) === 0;
-}
-
-async function requestReport(anthropic: Anthropic, ideaText: string, niche: string | undefined) {
-  const userPrompt = `Business idea: ${ideaText}\nNiche/category: ${
-    niche || "(not specified)"
-  }\n\nResearch this idea's market and competitors, then score it.`;
-
-  const message = await anthropic.messages.create({
-    model: MODEL_ID,
-    max_tokens: 10000,
-    thinking: { type: "disabled" },
-    output_config: {
-      effort: "medium",
-      format: { type: "json_schema", schema: REPORT_SCHEMA },
-    },
-    system: SYSTEM_PROMPT,
-    tools: [
-      { type: "web_search_20260209", name: "web_search", max_uses: 2 },
-    ],
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  if (message.stop_reason === "refusal") {
-    throw new Error("The model declined to process this request.");
-  }
-
-  const textBlock = message.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No structured report returned by the model");
-  }
-
-  return JSON.parse(textBlock.text);
 }
 
 async function runAnalysis(
@@ -301,33 +390,36 @@ async function runAnalysis(
 ) {
   try {
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
+    const userPrompt = `Business idea: ${ideaText}\nNiche/category: ${
+      niche || "(not specified)"
+    }\n\nResearch this idea's market and competitors, then score it.`;
 
-    let report: Awaited<ReturnType<typeof requestReport>> | undefined;
-    let lastError: unknown;
-
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        const candidate = await requestReport(anthropic, ideaText, niche);
-        if (!isDegenerateReport(candidate)) {
-          report = candidate;
-          break;
-        }
-        lastError = new Error("Model returned an empty/placeholder report");
-        console.error(`Attempt ${attempt}: degenerate report, retrying`);
-      } catch (err) {
-        lastError = err;
-        console.error(`Attempt ${attempt} failed:`, err);
-      }
-    }
-
-    if (!report) {
-      await markFailed(
-        supabase,
-        submissionId,
-        lastError instanceof Error ? lastError.message : "Failed to generate a report",
-      );
-      return;
-    }
+    // This report is now the paid product, so it runs deeper than the
+    // original default: more search budget (4 instead of 2) so there's more
+    // real material to draw on and cite, and named-source citations in the
+    // prompt above so the report reads as thorough through specific,
+    // checkable detail rather than through raw effort. effort stays at
+    // "medium" - "high" effort at this search budget was observed to
+    // regularly approach or exceed even a 130s timeout on real runs, which
+    // doesn't reliably fit the free Supabase plan's 150s wall-clock limit
+    // (see git history for the discarded high-effort attempt). A single
+    // attempt (maxAttempts: 1) rather than two keeps the worst case well
+    // under that limit and avoids doubling the cost of a heavier-than-
+    // original call.
+    const report = await requestWithRetry<Report>(
+      () =>
+        requestStructuredReport<Report>(anthropic, {
+          systemPrompt: SYSTEM_PROMPT,
+          userPrompt,
+          schema: REPORT_SCHEMA,
+          maxTokens: 13000,
+          webSearchMaxUses: 4,
+          effort: "medium",
+          timeoutMs: 90000,
+        }),
+      isDegenerateReport,
+      1,
+    );
 
     const { error: updateError } = await supabase
       .from("submissions")
@@ -336,31 +428,12 @@ async function runAnalysis(
 
     if (updateError) {
       console.error("Failed to save completed report:", updateError);
+      await markFailed(supabase, "submissions", submissionId, updateError.message);
     }
   } catch (err) {
     console.error(err);
-    try {
-      await markFailed(
-        supabase,
-        submissionId,
-        err instanceof Error ? err.message : "Unknown error",
-      );
-    } catch (markFailedErr) {
-      console.error("Failed to mark submission as failed:", markFailedErr);
-    }
+    await markFailed(supabase, "submissions", submissionId, describeError(err));
   }
-}
-
-async function markFailed(
-  supabase: SupabaseClient,
-  submissionId: string,
-  errorMessage: string,
-) {
-  const { error } = await supabase
-    .from("submissions")
-    .update({ status: "failed", error_message: errorMessage })
-    .eq("id", submissionId);
-  if (error) console.error("Failed to mark submission as failed:", error);
 }
 
 function json(body: unknown, status = 200) {
