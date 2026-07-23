@@ -116,14 +116,17 @@ export async function requestWithRetry<T>(
 }
 
 // Distinguishes a hung/slow request (the timeout added above) from other
-// failures, so the row's error_message tells the user this was a transient
-// provider issue worth retrying rather than something wrong with their input.
+// failures, so the row's error_message points the user at retrying rather
+// than something wrong with their input. This is our own timeoutMs cutting
+// the request short, not necessarily anything wrong on Anthropic's end - in
+// practice most of these are just a thorough request that ran past our
+// budget, so the message shouldn't guess at a cause we haven't confirmed.
 // The SDK's error classes never override `Error`'s default `.name` ("Error"
 // for all of them), so this has to check the class itself rather than
 // `.name` - checking `.name` would silently never match.
 export function describeError(err: unknown): string {
   if (err instanceof Anthropic.APIConnectionTimeoutError) {
-    return "This took too long to respond, most likely a temporary issue with our AI provider. Please try again.";
+    return "This took longer than expected to finish. Please try again.";
   }
   return err instanceof Error ? err.message : "Unknown error";
 }

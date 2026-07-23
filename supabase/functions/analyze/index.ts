@@ -399,13 +399,13 @@ async function runAnalysis(
     // real material to draw on and cite, and named-source citations in the
     // prompt above so the report reads as thorough through specific,
     // checkable detail rather than through raw effort. effort stays at
-    // "medium" - "high" effort at this search budget was observed to
-    // regularly approach or exceed even a 130s timeout on real runs, which
-    // doesn't reliably fit the free Supabase plan's 150s wall-clock limit
-    // (see git history for the discarded high-effort attempt). A single
-    // attempt (maxAttempts: 1) rather than two keeps the worst case well
-    // under that limit and avoids doubling the cost of a heavier-than-
-    // original call.
+    // "medium" - "high" effort at this search budget regularly ran past
+    // even a 130s timeout. Even at "medium", real runs have been observed
+    // to occasionally exceed 90s, so timeoutMs is set close to the free
+    // Supabase plan's 150s wall-clock ceiling as this can safely go (a
+    // single attempt, so there's no second call stacking on top of it). If
+    // this still times out often in practice, the two real remaining
+    // levers are the Supabase Pro plan's 400s ceiling, or fewer searches.
     const report = await requestWithRetry<Report>(
       () =>
         requestStructuredReport<Report>(anthropic, {
@@ -415,7 +415,7 @@ async function runAnalysis(
           maxTokens: 13000,
           webSearchMaxUses: 4,
           effort: "medium",
-          timeoutMs: 90000,
+          timeoutMs: 125000,
         }),
       isDegenerateReport,
       1,
